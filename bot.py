@@ -24,12 +24,6 @@ class TelegramNotifier:
             raise
 
     async def send_booking_notification(self, slot: QueueSlot, db_session: Session):
-        """
-        Отправляет уведомление в Telegram-группу о новой записи
-        
-        :param slot: Объект QueueSlot (запись)
-        :param db_session: Сессия базы данных SQLAlchemy
-        """
         try:
             user = db_session.query(User).filter(User.id == slot.user_id).first()
             branch = db_session.query(Branch).filter(Branch.id == slot.branch_id).first()

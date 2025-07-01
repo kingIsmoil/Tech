@@ -89,6 +89,9 @@ def login_for_access_token(
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(User.email == form_data.username).first()
+    if user.is_verified == False:
+        raise HTTPException(status_code=401,detail="Not verified")
+    
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -315,7 +318,6 @@ def delete_branch(
     db.commit()
     return {"message": "Branch deleted successfully"}
 
-# main.py (изменение эндпоинта book_slot)
 from bot import telegram_notifier
 
 @app.post("/book-slot/", response_model=QueueSlotOut)
