@@ -315,33 +315,45 @@ def delete_branch(
     db.commit()
     return {"message": "Branch deleted successfully"}
 
-@app.post("/branches/", response_model=BranchOut)
-def create_branch(
-    branch: BranchCreate,  
+# main.py (изменение эндпоинта book_slot)
+from bot import telegram_notifier
+
+@app.post("/book-slot/", response_model=QueueSlotOut)
+async def book_slot(
+    slot: QueueSlotCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    org = db.query(Organization).filter(
-        Organization.id == branch.organization_id,
-        Organization.owner_id == current_user.id
+    branch = db.query(Branch).filter(Branch.id == slot.branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Филиал не найден")
+    
+    existing_slot = db.query(QueueSlot).filter(
+        QueueSlot.branch_id == slot.branch_id,
+        QueueSlot.date == slot.date,
+        QueueSlot.time == slot.time,
+        QueueSlot.status == QueueSlotStatus.BOOKED
     ).first()
     
-    if not org:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't own this organization or it doesn't exist"
-        )
+    if existing_slot:
+        raise HTTPException(status_code=400, detail="Это время уже занято")
     
-    db_branch = Branch(
-        organization_id=branch.organization_id,
-        name=branch.name,
-        address=branch.address,
-        schedule=branch.schedule
+    db_slot = QueueSlot(
+        branch_id=slot.branch_id,
+        user_id=current_user.id,
+        date=slot.date,
+        time=slot.time,
+        status=QueueSlotStatus.BOOKED
     )
-    db.add(db_branch)
+    db.add(db_slot)
     db.commit()
-    db.refresh(db_branch)
-    return db_branch
+    db.refresh(db_slot)
+    
+    send_booking_confirmation(current_user.email, slot.date, slot.time, branch.name)
+    
+    await telegram_notifier.send_booking_notification(db_slot, db)
+    
+    return db_slot
 
 @app.get("/organizations/{org_id}/stats", response_model=OrganizationStats)
 async def get_organization_stats(
