@@ -32,6 +32,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 def send_verification_email(email: str):
     token = create_verification_token(email)
+    print(f"DEBUG: sending email to {email}")
     link = f"http://localhost:8000/verify-email?token={token}"
     message = MIMEText(f"Здравствуйте! Подтвердите ваш email, перейдя по ссылке:\n{link}")
     message["Subject"] = "Подтверждение Email"

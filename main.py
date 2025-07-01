@@ -193,9 +193,131 @@ def create_organization(
     db.refresh(db_org)
     return db_org
 
+@app.get("/organizations/", response_model=List[OrganizationOut])
+def get_organizations(
+    category: Optional[str] = None,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100
+):
+    query = db.query(Organization)
+    if category:
+        query = query.filter(Organization.category == category)
+    return query.offset(skip).limit(limit).all()
+
+@app.get("/organizations/{org_id}", response_model=OrganizationOut)
+def get_organization(org_id: int, db: Session = Depends(get_db)):
+    db_org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not db_org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    return db_org
+
+@app.put("/organizations/{org_id}", response_model=OrganizationOut)
+def update_organization(
+    org_id: int,
+    org: OrganizationUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not db_org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    if db_org.owner_id != current_user.id and current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized to update this organization")
+    
+    update_data = org.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_org, field, value)
+    
+    db.commit()
+    db.refresh(db_org)
+    return db_org
+
+@app.get("/organizations/{org_id}/branches", response_model=List[BranchOut])
+def get_organization_branches(
+    org_id: int,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100
+):
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    return db.query(Branch).filter(
+        Branch.organization_id == org_id
+    ).offset(skip).limit(limit).all()
+
+@app.get("/branches/", response_model=List[BranchOut])
+def get_branches(
+    organization_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100
+):
+    query = db.query(Branch)
+    if organization_id:
+        query = query.filter(Branch.organization_id == organization_id)
+    return query.offset(skip).limit(limit).all()
+
+@app.get("/branches/{branch_id}", response_model=BranchOut)
+def get_branch(branch_id: int, db: Session = Depends(get_db)):
+    db_branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not db_branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    return db_branch
+
+@app.put("/branches/{branch_id}", response_model=BranchOut)
+def update_branch(
+    branch_id: int,
+    branch: BranchUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not db_branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    
+    org = db.query(Organization).filter(
+        Organization.id == db_branch.organization_id,
+        Organization.owner_id == current_user.id
+    ).first()
+    if not org:
+        raise HTTPException(status_code=403, detail="Not authorized to update this branch")
+    
+    update_data = branch.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_branch, field, value)
+    
+    db.commit()
+    db.refresh(db_branch)
+    return db_branch
+
+@app.delete("/branches/{branch_id}")
+def delete_branch(
+    branch_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not db_branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    
+    org = db.query(Organization).filter(
+        Organization.id == db_branch.organization_id,
+        Organization.owner_id == current_user.id
+    ).first()
+    if not org:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this branch")
+    
+    db.delete(db_branch)
+    db.commit()
+    return {"message": "Branch deleted successfully"}
+
 @app.post("/branches/", response_model=BranchOut)
 def create_branch(
-    branch: BranchCreate,  # Теперь branch содержит organization_id
+    branch: BranchCreate,  
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

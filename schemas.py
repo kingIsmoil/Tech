@@ -93,3 +93,13 @@ class OrganizationStats(BaseModel):
     class Config:
         orm_mode = True
 
+class BranchUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    schedule: Optional[Dict] = None
+
+class OrganizationUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    address: Optional[str] = None
