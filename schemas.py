@@ -33,7 +33,6 @@ class Token(BaseModel):
     token_type: str
 
 class OrganizationCreate(BaseModel):
-    organization_id:int
     name: str
     category: str
     description: Optional[str] = None
@@ -52,13 +51,13 @@ class OrganizationOut(BaseModel):
         orm_mode = True
 
 class BranchCreate(BaseModel):
+    organization_id: int
     name: str
     address: str
     schedule: Optional[Dict] = None
 
 class BranchOut(BaseModel):
     id: int
-    organization_id: int
     name: str
     address: str
     schedule: Optional[Dict]
